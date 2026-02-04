@@ -1,3 +1,4 @@
+# CustomZoomImageView - Tài liệu hướng dẫn sử dụng và Giải thích Logic
 
 ## 1. Tổng quan
 `CustomZoomImageView` là một Custom View kế thừa từ `AppCompatImageView`, cung cấp các tính năng nâng cao sau cho việc hiển thị ảnh trong Android:
@@ -84,43 +85,70 @@ photoView.setWidthPercentageAndAspectRatio(0.8f, 9f / 16f)
 
 ---
 
-## 3. Giải thích Logic Chi tiết
+## 3. Giải thích Logic Chi tiết và Các Biến Quan Trọng
 
-Lõi của `CustomZoomImageView` xoay quanh việc thao tác với `Matrix` của Android Graphics.
+### 3.1. Các Biến Matrix (Ma trận biến đổi)
+Logic cốt lõi của việc Zoom/Move ảnh dựa trên việc nhân các Matrix với nhau. Class này sử dụng mô hình 3 lớp Matrix:
 
-### 3.1. Matrix Architecture
-Chúng ta sử dụng mô hình 3 lớp Matrix:
-1.  **`baseMatrix`**: Matrix nền tảng. Chịu trách nhiệm đưa ảnh gốc (Drawable) về kích thước hiển thị ban đầu (Initial State) dựa trên `SizingMode` (ví dụ: fit center, fill screen, hay fixed size).
-2.  **`suppMatrix` (Supplementary Matrix)**: Matrix bổ sung. Lưu trữ các biến đổi do người dùng thao tác: Zoom (Scale), Drag (Translate).
-3.  **`drawMatrix`**: Kết quả cuối cùng. `drawMatrix = baseMatrix * suppMatrix`. Đây là matrix thực tế được set vào `ImageView.imageMatrix` để vẽ lên màn hình.
+1.  **`baseMatrix`**: 
+    *   **Vai trò**: Matrix nền tảng, quyết định trạng thái "ban đầu" (initial state) của ảnh khi chưa zoom/kéo.
+    *   **Chức năng**: Đưa ảnh gốc (Drawable) về đúng kích thước và vị trí mong muốn (theo `SizingMode`).
+    *   **Ví dụ**: Khi gọi `setFixedWidth(200)`, `baseMatrix` sẽ được set scale sao cho ảnh rộng đúng 200px và translate để ảnh nằm giữa màn hình.
+    
+2.  **`suppMatrix` (Supplementary Matrix)**: 
+    *   **Vai trò**: Matrix bổ sung, lưu trữ các biến đổi do người dùng thao tác.
+    *   **Chức năng**: Khi bạn zoom vào 2x, `suppMatrix` sẽ lưu giá trị scale = 2. Khi bạn kéo ảnh sang phải 50px, `suppMatrix` lưu translate x = 50.
+    *   **Khi reset**: Gọi `resetScale()` thực chất là reset `suppMatrix` về defalt, giữ nguyên `baseMatrix`.
 
-### 3.2. Logic Zoom & Drag
-*   **ScaleGestureDetector**: Dùng để bắt sự kiện 2 ngón tay. Khi phát hiện sự kiện `onScale`, ta lấy `scaleFactor` nhân vào `suppMatrix`.
-*   **GestureDetector (onScroll)**: Dùng để bắt sự kiện kéo tay 1 ngón. Khi kéo, ta dịch chuyển `suppMatrix` (`postTranslate`).
-*   **Bounds Check (`checkMatrixBounds`)**: Sau mỗi lần thay đổi matrix, hàm này được gọi để đảm bảo ảnh không bị kéo ra quá xa khỏi màn hình. Nếu ảnh nhỏ hơn màn hình, nó sẽ tự động dùng matrix để đưa ảnh về chính giữa (`center`).
+3.  **`drawMatrix`**:
+    *   **Vai trò**: Matrix kết quả cuối cùng để vẽ.
+    *   **Công thức**: `drawMatrix = baseMatrix * suppMatrix`.
+    *   `imageMatrix` của `ImageView` sẽ được set bằng `drawMatrix`.
 
-### 3.3. Logic Sizing Modes (Tính năng nâng cao)
-Đây là phần custom chính so với thư viện gốc. Thay vì chỉ dùng `ScaleType.FIT_CENTER` mặc định, ta tự tính toán `scale` khởi tạo trong hàm `updateBaseMatrix()`.
+### 3.2. Các Biến Logic Khác
+*   **`displayRect`**: Hình chữ nhật (RectF) chứa tọa độ thực tế của ảnh đang hiển thị trên màn hình. Nó được tính bằng cách lấy kích thước ảnh gốc nhân với `drawMatrix`. Chúng ta dùng biến này để kiểm tra xem điểm chạm (tap) có nằm trong ảnh hay không (Outside Tap).
+*   **`matrixValues`**: Mảng float tạm thời dùng để trích xuất giá trị từ Matrix (như scale hiện tại, vị trí X/Y). Dùng để tránh cấp phát bộ nhớ liên tục trong `onDraw`.
+*   **`SizingMode`**: Enum xác định chế độ scale ảnh hiện tại (ví dụ `PERCENT_WIDTH_AUTO_HEIGHT`).
+*   **`targetWidthFixed`/`targetHeightFixed`**: Các biến lưu giá trị pixel mục tiêu mà người dùng set.
 
-**Quy trình:**
-1.  Lấy kích thước View (`viewWidth`, `viewHeight`) và kích thước ảnh gốc (`drawableWidth`, `drawableHeight`).
-2.  Lấy thông tin màn hình (`DisplayMetrics`) để phục vụ tính toán phần trăm.
-3.  Dựa vào `sizingMode` đang set, tính toán ra tỷ lệ `scale` cần thiết:
-    *   *Ví dụ Case `FIXED_WIDTH_AUTO_HEIGHT`*: `scale = targetWidth / drawableWidth`.
-    *   *Ví dụ Case `PERCENT_WIDTH_ASPECT_RATIO`*:
-        *   Tính `targetWidthPixel = screenWidth * percentage`.
-        *   `scale = targetWidthPixel / drawableWidth`. (Chiều cao tự động đi theo scale này nên tỷ lệ ảnh luôn đúng).
-4.  Áp dụng `scale` vào `baseMatrix`.
-5.  Dịch chuyển `baseMatrix` để ảnh nằm giữa View container.
+### 3.3. Giải thích Hàm Quan Trọng
 
-### 3.4. Logic Outside Tap
-Sử dụng `GestureDetector.onSingleTapConfirmed`:
-1.  Lấy hình chữ nhật bao quanh ảnh hiện tại (`getDisplayRect`).
-2.  Kiểm tra tọa độ điểm chạm (`e.x`, `e.y`) có nằm trong hình chữ nhật đó không.
-3.  Nếu **KHÔNG** nằm trong -> Người dùng tap vào vùng đen -> Gọi callback listener và reset `suppMatrix` về defalt (thu nhỏ ảnh).
+#### `updateBaseMatrix(d: Drawable?)`
+Đây là hàm quan trọng nhất để xử lý kích thước ảnh.
+*   **Kích hoạt**: Gọi khi ảnh thay đổi (setImage...), khi View thay đổi kích thước (onLayout), hoặc khi người dùng gọi các hàm set kích thước (setSize...).
+*   **Logic**:
+    1.  Lấy kích thước View và Drawable.
+    2.  Dựa vào `sizingMode`, tính toán `scale` cần thiết. Ví dụ `offset` = Width mong muốn / Width ảnh gốc.
+    3.  Lưu `scale` đó vào `baseMatrix`.
+    4.  Tính toán `translate` để đưa ảnh đã scale về giữa View (Center).
+    5.  Reset `suppMatrix` (nếu đang zoom dở thì sẽ bị reset khi đổi kích thước base).
+    
+#### `checkMatrixBounds()`
+Hàm bảo vệ "ranh giới" ảnh.
+*   **Kích hoạt**: Sau mỗi lần người dùng Zoom hoặc Drag.
+*   **Logic**:
+    *   Nếu ảnh nhỏ hơn View container: Buộc ảnh phải nằm giữa centered.
+    *   Nếu ảnh lớn hơn View (đang zoom): Đảm bảo người dùng không kéo "quá đà" để lộ khoảng đen (trừ khi chạm mép).
+    
+#### `onScale(detector)`
+Callback từ `ScaleGestureDetector`.
+*   Nhận `scaleFactor` (tỷ lệ zoom tương đối, ví dụ 1.05 là to lên 5%).
+*   Nhân `scaleFactor` vào `suppMatrix`.
+*   Gọi `updateImageMatrix()` để áp dụng lên View.
+
+#### `onScroll(...)`
+Callback từ `GestureDetector`.
+*   Nhận `distanceX`, `distanceY`.
+*   Dịch chuyển `suppMatrix` ngược lại (`-distance`).
+*   Kiểm tra nếu đang ở mép ảnh và đang zoom, thì có thể `requestDisallowInterceptTouchEvent` để ViewPager bên ngoài (nếu có) không cướp sự kiện vuốt.
+
+#### `FlingRunnable` (Inner Class)
+Xử lý quán tính (Newtons' Law) khi vuốt mạnh.
+*   Sử dụng `OverScroller` của Android để tính toán tọa độ theo thời gian.
+*   `run()` được gọi đệ quy (thông qua `postOnAnimation`) cho đến khi `scroller` dừng lại. Mỗi lần chạy nó sẽ dịch chuyển `suppMatrix` và vẽ lại View.
 
 ---
 
 ## 4. Lưu ý khi phát triển tiếp
 *   Luôn gọi `updateBaseMatrix()` khi source ảnh thay đổi (`setImageDrawable`...) để đảm bảo logic sizing được áp dụng lại.
-*   Cần cẩn thận với trường hợp `width` hoặc `height` của View bằng 0 (lúc chưa layout xong), code đã có check Guard Clause để tránh crash.
+*   Cần cẩn thận với trường hợp `width` hoặc `height` của View bằng 0 (lúc chưa layout xong, hoặc View.GONE), code đã có check Guard Clause (`if (viewWidth <= 0) return`) để tránh crash chia cho 0.
