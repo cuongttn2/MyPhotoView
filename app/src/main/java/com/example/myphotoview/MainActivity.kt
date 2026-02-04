@@ -23,6 +23,7 @@ class MainActivity : AppCompatActivity() {
         photoView.onOutsidePhotoTapListener = {
             android.widget.Toast.makeText(this, "Outside Tap! Resetting Scale & Starting Activity...", android.widget.Toast.LENGTH_SHORT).show()
         }
+        val density = resources.displayMetrics.density
 
         // --- Demo for Requirement 1: Fixed Height (200dp) ---
         // val density = resources.displayMetrics.density
@@ -50,10 +51,12 @@ class MainActivity : AppCompatActivity() {
         // photoView.setPercentDimensions(0.5f, 0.5f)
 
         // --- Demo for Requirement 2b: Width 80% screen, Height 16:9 Aspect Ratio ---
-        val density = resources.displayMetrics.density
         // Uncomment below to test:
         // photoView.setWidthPercentageAndAspectRatio(0.8f, 9f / 16f)
         
         // Default: just let xml handle it (match_parent)
+        // --- Demo: Setting Image Programmatically ---
+        // Verify that setting image from code works and correctly resets/fits the image
+         photoView.setImageResource(R.drawable.image_prev)
     }
 }

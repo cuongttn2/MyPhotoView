@@ -21,6 +21,30 @@ class CustomZoomImageView @JvmOverloads constructor(
     GestureDetector.OnGestureListener,
     GestureDetector.OnDoubleTapListener {
 
+    override fun setImageBitmap(bm: android.graphics.Bitmap?) {
+        super.setImageBitmap(bm)
+        updateBaseMatrix(drawable)
+        if (sizingMode != SizingMode.NONE) requestLayout()
+    }
+
+    override fun setImageDrawable(drawable: Drawable?) {
+        super.setImageDrawable(drawable)
+        updateBaseMatrix(drawable)
+        if (sizingMode != SizingMode.NONE) requestLayout()
+    }
+
+    override fun setImageResource(resId: Int) {
+        super.setImageResource(resId)
+        updateBaseMatrix(drawable)
+        if (sizingMode != SizingMode.NONE) requestLayout()
+    }
+
+    override fun setImageURI(uri: android.net.Uri?) {
+        super.setImageURI(uri)
+        updateBaseMatrix(drawable)
+        if (sizingMode != SizingMode.NONE) requestLayout()
+    }
+
     private val baseMatrix = Matrix()
     private val suppMatrix = Matrix()
     private val drawMatrix = Matrix()
@@ -87,21 +111,24 @@ class CustomZoomImageView @JvmOverloads constructor(
         sizingMode = SizingMode.FIXED_SIZE
         targetWidthFixed = widthPx
         targetHeightFixed = heightPx
-        requestLayout()
+        updateBaseMatrix(drawable)
+        invalidate()
     }
 
     /** 2. Fixed Width, Image Aspect Ratio determines Height */
     fun setFixedWidth(widthPx: Int) {
         sizingMode = SizingMode.FIXED_WIDTH_AUTO_HEIGHT
         targetWidthFixed = widthPx
-        requestLayout()
+        updateBaseMatrix(drawable)
+        invalidate()
     }
 
     /** 3. Fixed Height, Image Aspect Ratio determines Width */
     fun setFixedHeight(heightPx: Int) {
         sizingMode = SizingMode.FIXED_HEIGHT_AUTO_WIDTH
         targetHeightFixed = heightPx
-        requestLayout()
+        updateBaseMatrix(drawable)
+        invalidate()
     }
 
     /** 4. Fixed Width, Explicit Aspect Ratio determines Height */
@@ -109,21 +136,24 @@ class CustomZoomImageView @JvmOverloads constructor(
         sizingMode = SizingMode.FIXED_WIDTH_ASPECT_RATIO
         targetWidthFixed = widthPx
         targetAspectRatio = aspectRatio
-        requestLayout()
+        updateBaseMatrix(drawable)
+        invalidate()
     }
 
     /** 5. Width = % of Screen, Image Aspect Ratio determines Height */
     fun setWidthPercent(percent: Float) {
         sizingMode = SizingMode.PERCENT_WIDTH_AUTO_HEIGHT
         targetWidthPercent = percent
-        requestLayout()
+        updateBaseMatrix(drawable)
+        invalidate()
     }
 
     /** 6. Height = % of Screen, Image Aspect Ratio determines Width */
     fun setHeightPercent(percent: Float) {
         sizingMode = SizingMode.PERCENT_HEIGHT_AUTO_WIDTH
         targetHeightPercent = percent
-        requestLayout()
+        updateBaseMatrix(drawable)
+        invalidate()
     }
 
     /** 7. Width = % of Screen, Height = Fixed Pixels */
@@ -131,7 +161,8 @@ class CustomZoomImageView @JvmOverloads constructor(
         sizingMode = SizingMode.PERCENT_WIDTH_FIXED_HEIGHT
         targetWidthPercent = widthPercent
         targetHeightFixed = heightPx
-        requestLayout()
+        updateBaseMatrix(drawable)
+        invalidate()
     }
 
     /** 8. Height = % of Screen, Width = Fixed Pixels */
@@ -139,7 +170,8 @@ class CustomZoomImageView @JvmOverloads constructor(
         sizingMode = SizingMode.PERCENT_HEIGHT_FIXED_WIDTH
         targetHeightPercent = heightPercent
         targetWidthFixed = widthPx
-        requestLayout()
+        updateBaseMatrix(drawable)
+        invalidate()
     }
 
     /** 9. Width = % of Screen, Height = % of Screen */
@@ -147,7 +179,8 @@ class CustomZoomImageView @JvmOverloads constructor(
         sizingMode = SizingMode.PERCENT_BOTH
         targetWidthPercent = widthPercent
         targetHeightPercent = heightPercent
-        requestLayout()
+        updateBaseMatrix(drawable)
+        invalidate()
     }
 
     /** 10. Width = % of Screen, Height = Aspect Ratio * Width */
@@ -155,84 +188,14 @@ class CustomZoomImageView @JvmOverloads constructor(
         sizingMode = SizingMode.PERCENT_WIDTH_ASPECT_RATIO
         targetWidthPercent = widthPercent
         targetAspectRatio = aspectRatio
-        requestLayout()
-    }
-
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        if (sizingMode == SizingMode.NONE) {
-            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-            return
-        }
-
-        val d = drawable
-        val displayMetrics = resources.displayMetrics
-        val screenWidth = displayMetrics.widthPixels
-        val screenHeight = displayMetrics.heightPixels // Note: includes system bars usually
-        
-        var w = 0
-        var h = 0
-        
-        // Helper for Image Ratio (W/H)
-        val imageRatio = if (d != null && d.intrinsicHeight > 0) {
-            d.intrinsicWidth.toFloat() / d.intrinsicHeight.toFloat()
-        } else {
-            1.0f // Square fallback
-        }
-
-        when (sizingMode) {
-            SizingMode.FIXED_SIZE -> {
-                w = targetWidthFixed
-                h = targetHeightFixed
-            }
-            SizingMode.FIXED_WIDTH_AUTO_HEIGHT -> {
-                w = targetWidthFixed
-                h = (w / imageRatio).toInt()
-            }
-            SizingMode.FIXED_HEIGHT_AUTO_WIDTH -> {
-                h = targetHeightFixed
-                w = (h * imageRatio).toInt()
-            }
-            SizingMode.FIXED_WIDTH_ASPECT_RATIO -> {
-                w = targetWidthFixed
-                h = (w * targetAspectRatio).toInt()
-            }
-            SizingMode.PERCENT_WIDTH_AUTO_HEIGHT -> {
-                w = (screenWidth * targetWidthPercent).toInt()
-                h = (w / imageRatio).toInt()
-            }
-            SizingMode.PERCENT_HEIGHT_AUTO_WIDTH -> {
-                h = (screenHeight * targetHeightPercent).toInt()
-                w = (h * imageRatio).toInt()
-            }
-            SizingMode.PERCENT_WIDTH_FIXED_HEIGHT -> {
-                w = (screenWidth * targetWidthPercent).toInt()
-                h = targetHeightFixed
-            }
-            SizingMode.PERCENT_HEIGHT_FIXED_WIDTH -> {
-                h = (screenHeight * targetHeightPercent).toInt()
-                w = targetWidthFixed
-            }
-            SizingMode.PERCENT_BOTH -> {
-                w = (screenWidth * targetWidthPercent).toInt()
-                h = (screenHeight * targetHeightPercent).toInt()
-            }
-            SizingMode.PERCENT_WIDTH_ASPECT_RATIO -> {
-                w = (screenWidth * targetWidthPercent).toInt()
-                h = (w * targetAspectRatio).toInt()
-            }
-            else -> {}
-        }
-        
-        setMeasuredDimension(w, h)
+        updateBaseMatrix(drawable)
+        invalidate()
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-        // Parent onLayout actually calls layout() -> setFrame()
-        // We just need to ensure updateBaseMatrix is called if size changed
         super.onLayout(changed, left, top, right, bottom)
-        if (changed) {
-            updateBaseMatrix(drawable)
-        }
+        // Always update matrix to ensure centering
+        updateBaseMatrix(drawable)
     }
 
     private fun updateBaseMatrix(d: Drawable?) {
@@ -240,19 +203,88 @@ class CustomZoomImageView @JvmOverloads constructor(
 
         val viewWidth = width.toFloat()
         val viewHeight = height.toFloat()
+        
+        if (viewWidth <= 0 || viewHeight <= 0) return 
+
         val drawableWidth = d.intrinsicWidth.toFloat()
         val drawableHeight = d.intrinsicHeight.toFloat()
 
         baseMatrix.reset()
-
-        val widthScale = viewWidth / drawableWidth
-        val heightScale = viewHeight / drawableHeight
-        val scale = widthScale.coerceAtMost(heightScale)
+        
+        var scale = 1f
+        
+        val displayMetrics = resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels.toFloat()
+        val screenHeight = displayMetrics.heightPixels.toFloat()
+        
+        when (sizingMode) {
+             SizingMode.NONE -> {
+                 val widthScale = viewWidth / drawableWidth
+                 val heightScale = viewHeight / drawableHeight
+                 scale = widthScale.coerceAtMost(heightScale)
+             }
+             SizingMode.FIXED_SIZE -> {
+                 val wScale = targetWidthFixed / drawableWidth
+                 val hScale = targetHeightFixed / drawableHeight
+                 scale = wScale.coerceAtMost(hScale)
+             }
+             SizingMode.FIXED_WIDTH_AUTO_HEIGHT -> {
+                 scale = targetWidthFixed / drawableWidth
+             }
+             SizingMode.FIXED_HEIGHT_AUTO_WIDTH -> {
+                 scale = targetHeightFixed / drawableHeight
+             }
+             SizingMode.FIXED_WIDTH_ASPECT_RATIO -> {
+                 scale = targetWidthFixed / drawableWidth
+             }
+             SizingMode.PERCENT_WIDTH_AUTO_HEIGHT -> {
+                 val targetPixels = screenWidth * targetWidthPercent
+                 scale = targetPixels / drawableWidth
+             }
+             SizingMode.PERCENT_HEIGHT_AUTO_WIDTH -> {
+                 val targetPixels = screenHeight * targetHeightPercent
+                 scale = targetPixels / drawableHeight
+             }
+             SizingMode.PERCENT_WIDTH_FIXED_HEIGHT -> {
+                 val tW = screenWidth * targetWidthPercent
+                 val tH = targetHeightFixed.toFloat()
+                 val sW = tW / drawableWidth
+                 val sH = tH / drawableHeight
+                 scale = sW.coerceAtMost(sH)
+             }
+             SizingMode.PERCENT_HEIGHT_FIXED_WIDTH -> {
+                 val tH = screenHeight * targetHeightPercent
+                 val tW = targetWidthFixed.toFloat()
+                 val sW = tW / drawableWidth
+                 val sH = tH / drawableHeight
+                 scale = sW.coerceAtMost(sH)
+             }
+             SizingMode.PERCENT_BOTH -> {
+                 val tW = screenWidth * targetWidthPercent
+                 val tH = screenHeight * targetHeightPercent
+                 val sW = tW / drawableWidth
+                 val sH = tH / drawableHeight
+                 scale = sW.coerceAtMost(sH)
+             }
+             SizingMode.PERCENT_WIDTH_ASPECT_RATIO -> {
+                 // Width = % Screen. Height = Width * Ratio.
+                 val tW = screenWidth * targetWidthPercent
+                 val tH = tW * targetAspectRatio
+                 val sW = tW / drawableWidth
+                 val sH = tH / drawableHeight
+                 scale = sW.coerceAtMost(sH)
+             }
+        }
 
         baseMatrix.postScale(scale, scale)
+        
+        // Center the scaled image in the view
+        val scaledW = drawableWidth * scale
+        val scaledH = drawableHeight * scale
+        
         baseMatrix.postTranslate(
-            (viewWidth - drawableWidth * scale) / 2f,
-            (viewHeight - drawableHeight * scale) / 2f
+            (viewWidth - scaledW) / 2f,
+            (viewHeight - scaledH) / 2f
         )
         
         suppMatrix.reset()
@@ -260,6 +292,7 @@ class CustomZoomImageView @JvmOverloads constructor(
     }
 
     private fun updateImageMatrix() {
+        if (width <= 0 || height <= 0) return
         drawMatrix.set(baseMatrix)
         drawMatrix.postConcat(suppMatrix)
         checkMatrixBounds()
